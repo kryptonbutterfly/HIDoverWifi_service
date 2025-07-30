@@ -1,0 +1,9 @@
+/deb-content/changelog
+/deb-content/version.txt
+/build
+/target
+/.settings
+.project
+*.jks
+*.p12
+*.json

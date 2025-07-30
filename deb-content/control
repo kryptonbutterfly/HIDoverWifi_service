@@ -1,0 +1,8 @@
+Homepage: https://kryptonbutterfly.github.io/
+Section: Network
+Priority: optional
+Maintainer: kryptonbutterfly <kryptonbutterfly@gmail.com>
+#Vcs-Browser: https://github.com/kryptonbutterfly/HIDoverWifi
+Description: HIDoverWifi Service
+Architecture: all
+Depends: openjdk-21-jre | openjdk-21-jdk, xdotool
