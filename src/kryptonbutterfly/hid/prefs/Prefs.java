@@ -26,6 +26,9 @@ public final class Prefs
 	public float mouseAcceleration = 1.3F;
 	
 	@Expose
+	public boolean sendClipboardEvents = true;
+	
+	@Expose
 	public int connectionIdleTimeout = Constants.DEFAULT_IDLE_TIMEOUT;
 	
 	@Expose

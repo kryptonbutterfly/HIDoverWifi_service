@@ -27,7 +27,8 @@ public class ParamCommands
 		scroll_speed(scrollSpeed()),
 		accel(accel()),
 		password(serverPassword()),
-		timeout(timeout());
+		timeout(timeout()),
+		clipboard(clipboard());
 		
 		private final Param param;
 		
@@ -257,5 +258,14 @@ public class ParamCommands
 						System.out.printf("Execpted a number > 0, but got %s instead!\n", s);
 					}
 			});
+	}
+	
+	private static Param clipboard()
+	{
+		return new Param(
+			" — Whether clipboard changes will be sent to connected devices.",
+			" %-14s — Whether clipboard changes will be sent to connected devices.".formatted("[SEND]"),
+			() -> System.out.println(HIDoverWifi.prefs.sendClipboardEvents),
+			(s, _r) -> HIDoverWifi.prefs.sendClipboardEvents = "true".equals(s));
 	}
 }

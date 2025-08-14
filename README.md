@@ -14,7 +14,7 @@ A service that enables the use of your Android device as a mouse & keyboard.
   (requires dpkg & systemd, if missing installs xdotool & jre21)
 
 ## Setup
-* install the [HIDoverWifi.deb](https://github.com/kryptonbutterfly/HIDoverWifi_service/releases/download/v1.0.0/HIDoverWifi.deb) package
+* install the [HIDoverWifi.deb](https://github.com/kryptonbutterfly/HIDoverWifi_service/releases/download/v2.0.0/HIDoverWifi.deb) package
 * in order to configure the service run
   ```console
   sudo hidoverwifi
@@ -40,7 +40,7 @@ All settings are stored at:
 
 ## Manual setup
 
-* save the [HIDoverWifi.jar](https://github.com/kryptonbutterfly/HIDoverWifi_service/releases/download/v1.0.0/HIDoverWifi.jar) to a folder of your choosing
+* save the [HIDoverWifi.jar](https://github.com/kryptonbutterfly/HIDoverWifi_service/releases/download/v2.0.0/HIDoverWifi.jar) to a folder of your choosing
 * ensure you have xdotool and a jre21+ installed.
   [see](https://github.com/kryptonbutterfly/HIDoverWifi_service#ensure-dependencies-are-installed)
 * to configure run

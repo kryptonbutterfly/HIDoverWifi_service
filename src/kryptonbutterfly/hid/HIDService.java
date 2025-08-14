@@ -2,7 +2,14 @@ package kryptonbutterfly.hid;
 
 import static kryptonbutterfly.hid.Constants.*;
 
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.FlavorEvent;
+import java.awt.datatransfer.FlavorListener;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,7 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Objects;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -37,17 +44,56 @@ import kryptonbutterfly.hid.prefs.Prefs;
 
 public final class HIDService
 {
-	public static Prefs									prefs;
-	private static final ArrayList<ClientConnection>	connections		= new ArrayList<>();
-	private static volatile boolean						keepListening	= true;
+	public static Prefs								prefs;
+	private static final HashSet<ClientConnection>	connections		= new HashSet<>();
+	private static volatile boolean					keepListening	= true;
+	private static ServerSocket						socket			= null;
 	
-	private static ServerSocket socket = null;
+	private static Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+	
+	private static FlavorListener clipboardListener = new FlavorListener()
+	{
+		@Override
+		public void flavorsChanged(FlavorEvent _e)
+		{
+			if (!prefs.sendClipboardEvents)
+				return;
+			
+			try
+			{
+				if (!clipboard.getContents(null).isDataFlavorSupported(DataFlavor.stringFlavor))
+					return;
+				
+				final var s = (String) clipboard.getContents(null).getTransferData(DataFlavor.stringFlavor);
+				synchronized (connections)
+				{
+					connections.parallelStream().forEach(c -> {
+						try
+						{
+							c.oStream.writeUTF("CLIPBOARD");
+							c.oStream.writeUTF(s);
+						}
+						catch (IOException e)
+						{
+							e.printStackTrace();
+						}
+					});
+				}
+			}
+			catch (UnsupportedFlavorException | IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
+	};
 	
 	public static void startService()
 	{
 		prefs = Persister.load(CONFIG_FILE, Prefs.class);
 		
 		Thread.startVirtualThread(HIDService::startTimeoutConnections);
+		
+		clipboard.addFlavorListener(clipboardListener);
 		
 		startSslServer();
 	}
@@ -57,20 +103,24 @@ public final class HIDService
 		while (keepListening)
 			try
 			{
-				for (int i = 0; i < connections.size(); i++)
+				synchronized (connections)
 				{
-					final var c = connections.get(i);
-					if (c.isTimedOut(prefs.connectionIdleTimeout))
-					{
+					connections.stream().filter(c -> c.isTimedOut(prefs.connectionIdleTimeout)).forEach(c -> {
 						System.out.printf("Connection to %s timed out!\n", c.getAddress());
 						connections.remove(c);
-						c.close();
-					}
+						try
+						{
+							c.close();
+						}
+						catch (IOException e)
+						{}
+					});
 				}
 				Thread.sleep(prefs.connectionIdleTimeout / 6);
 			}
-			catch (InterruptedException | IndexOutOfBoundsException | IOException e)
+			catch (InterruptedException | IndexOutOfBoundsException e)
 			{}
+		
 	}
 	
 	private static void stopServer()
@@ -87,15 +137,21 @@ public final class HIDService
 		}
 		finally
 		{
-			while (!connections.isEmpty())
-				try
-				{
-					var conn = connections.removeLast();
-					if (!conn.isClosed())
-						conn.close();
-				}
-				catch (IOException e)
-				{}
+			synchronized (connections)
+			{
+				while (!connections.isEmpty())
+					try
+					{
+						for (final var c : connections)
+						{
+							if (!c.isClosed())
+								c.close();
+						}
+						connections.clear();
+					}
+					catch (IOException e)
+					{}
+			}
 			EventHandler.releaseAll();
 		}
 	}
@@ -196,7 +252,7 @@ public final class HIDService
 		final var address = socket.getInetAddress().getHostAddress();
 		System.out.printf("connected: %s\n", address);
 		ClientConnection connection = null;
-		try (final var iS = socket.getInputStream())
+		try (final var iS = socket.getInputStream(); final var oS = socket.getOutputStream())
 		{
 			socket.setSoTimeout(250);
 			final long Id = ByteBuffer.wrap(iS.readNBytes(Long.BYTES)).getLong();
@@ -218,10 +274,13 @@ public final class HIDService
 				else
 				{
 					socket.setSoTimeout(prefs.connectionIdleTimeout);
-					try (final var iStream = new DataInputStream(iS))
+					try (final var iStream = new DataInputStream(iS); final var oStream = new DataOutputStream(oS))
 					{
-						connection = new ClientConnection(socket, iStream);
-						connections.add(connection);
+						connection = new ClientConnection(socket, iStream, oStream);
+						synchronized (connections)
+						{
+							connections.add(connection);
+						}
 						while (keepListening && socket.isConnected())
 							EventHandler.event(connection);
 					}
@@ -252,7 +311,10 @@ public final class HIDService
 		finally
 		{
 			if (connection != null)
-				connections.remove(connection);
+				synchronized (connections)
+				{
+					connections.remove(connection);
+				}
 		}
 		
 		try
@@ -262,7 +324,7 @@ public final class HIDService
 		}
 		catch (IOException e)
 		{}
-		System.out.printf("disconnected: %s\nn", address);
+		System.out.printf("disconnected: %s\n", address);
 		EventHandler.releaseAll();
 	}
 }
